@@ -43,6 +43,8 @@ Dependencies.prototype.resolveRequirements = function(file, requirements, index,
     // for dynamic dependencies we don't attempt resolving
     if(!requirement.static) {
         file.dependencies.push({
+            path: requirement.path,
+            static: requirement.static,
             references : requirement.references,
             file : null,
             error : "Unable to resolve dynamic dependency"
@@ -55,6 +57,8 @@ Dependencies.prototype.resolveRequirements = function(file, requirements, index,
     if(Dependencies.cache[dirname] && Dependencies.cache[dirname][requirement.path]) {
         var cacheResult = Dependencies.cache[dirname][requirement.path];
         file.dependencies.push({
+            path: requirement.path,
+            static: requirement.static,
             references : requirement.references,
             file : cacheResult.file,
             error : cacheResult.error
@@ -77,6 +81,8 @@ Dependencies.prototype.resolveRequirements = function(file, requirements, index,
         };
 
         file.dependencies.push({
+            path: requirement.path,
+            static: requirement.static,
             references : requirement.references,
             file : dependent,
             error : err

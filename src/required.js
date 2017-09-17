@@ -1,7 +1,6 @@
 var path = require('path');
 var File = require('vinyl');
 var esprima = require('esprima');
-var walker = require('./ast-walker');
 
 /**
  * The description of a require call that has been located in a source file
@@ -46,8 +45,9 @@ function grabSource(source, range) {
  * @param  {Object} required An object to track requirements found within the
  *                           source AST, stored as source => Requirement
  * @param  {Object} node     A CallExpression node in the tree
+ * @param  {Object} metadata  Metadata about the node given to this method
  */
-function trackRequirement(source, required, node) {
+function trackRequirement(source, required, node, metadata) {
     var callee = node.callee;
     var args = node.arguments;
 
@@ -80,6 +80,20 @@ function trackRequirement(source, required, node) {
 }
 
 /**
+ * Takes a node from the syntax parser and dispatches it to
+ * the function matching the node type name
+ * @param  {Object} handlers An object whose keys are node types and values are functions
+ *                           that will be executed when that node type is encountered
+ * @param  {[type]} node     The node the parser is currently constructing
+ * @param  {[type]} metadata The metadata about the node being constructed
+ */
+function nodeDispatch(handlers, node, metadata) {
+    if(handlers[node.type]) {
+        handlers[node.type](node, metadata);
+    }
+}
+
+/**
  * This method takes a Vinyl file and finds all the require calls
  * within the source it contains
  * @param  {Vinyl} file A vinyl file to analyze
@@ -92,20 +106,20 @@ Required.analyze = function(file) {
     if(!File.isVinyl(file) || file.isNull()) {
         return null;
     }
-
+    // get a string representation of the file to parse
     var source = file.contents.toString();
 
-    // parse the file contents while tracking location
-    var ast = esprima.parse(source, {
-        loc : true,
-        range : true
-    });
-
-    // walk the ast and look for require statements
+    // variables used to collect the requirement information within the module
     var required = {};
-    walker.walk(ast, {
+    var handler = {
         CallExpression : trackRequirement.bind(null, source, required)
-    });
+    };
+
+    // parse the file as a module, scripts are not currently supported
+    var parserOptions = {
+        range : true
+    };
+    esprima.parseModule(source, parserOptions, nodeDispatch.bind(null, handler));
 
     // convert response to an array
     var trimed = [];

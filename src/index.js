@@ -1,6 +1,6 @@
-Resolver = require('./resolver')
-Required = require('./required')
-Dependencies = require('./dependencies')
+var Resolver = require('./resolver');
+var Required = require('./required');
+var Dependencies = require('./dependencies');
 
 /**
  * A module for analyzing javascript source files to produce a tree
@@ -9,7 +9,7 @@ Dependencies = require('./dependencies')
  */
 function Cartographer(options) {
     options = options || {}
-    this.resolver = options.resolver || new Resolver(options.resolverOptions)
+    this.resolver = options.resolver || new Resolver(options.resolverOptions);
     this.dependencies = options.dependencies || new Dependencies({
         resolver : this.resolver
     });
@@ -71,4 +71,4 @@ Cartographer.prototype.analyze = function(fileName, cb) {
     });
 };
 
-module.exports = Cartographer
+module.exports = Cartographer;
