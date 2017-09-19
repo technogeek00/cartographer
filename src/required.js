@@ -1,6 +1,6 @@
-var path = require('path');
-var File = require('vinyl');
-var esprima = require('esprima');
+let path = require('path');
+let File = require('vinyl');
+let esprima = require('esprima');
 
 /**
  * The description of a require call that has been located in a source file
@@ -48,16 +48,16 @@ function grabSource(source, range) {
  * @param  {Object} metadata  Metadata about the node given to this method
  */
 function trackRequirement(source, required, node, metadata) {
-    var callee = node.callee;
-    var args = node.arguments;
+    let callee = node.callee;
+    let args = node.arguments;
 
     if(callee.type != "Identifier" || callee.name != "require" || args.length != 1) {
         return;
     }
 
-    var first = args[0];
-    var staticRequire = first.type == "Literal";
-    var path = grabSource(source, first.range);
+    let first = args[0];
+    let staticRequire = first.type == "Literal";
+    let path = grabSource(source, first.range);
 
     // cleanup static paths since they will likely further resolve
     if(staticRequire) {
@@ -107,23 +107,23 @@ Required.analyze = function(file) {
         return null;
     }
     // get a string representation of the file to parse
-    var source = file.contents.toString();
+    let source = file.contents.toString();
 
     // variables used to collect the requirement information within the module
-    var required = {};
-    var handler = {
+    let required = {};
+    let handler = {
         CallExpression : trackRequirement.bind(null, source, required)
     };
 
     // parse the file as a module, scripts are not currently supported
-    var parserOptions = {
+    let parserOptions = {
         range : true
     };
     esprima.parseModule(source, parserOptions, nodeDispatch.bind(null, handler));
 
     // convert response to an array
-    var trimed = [];
-    for(var path in required) {
+    let trimed = [];
+    for(let path in required) {
         trimed.push(required[path]);
     }
 
