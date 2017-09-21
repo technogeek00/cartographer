@@ -137,9 +137,31 @@ class Resolver {
                 return cb(`Package file is incorrectly formatted: ${packagePath}`);
             }
 
-            // get the entry for the package and load the file
+            // get the entry for the package, resolve relative to the directory
             let entry = this.getEntryPoint(packageData);
-            this.loadFile(path.resolve(directory, entry), cb);
+            entry = path.resolve(directory, entry);
+
+            // attempt the entry load as a regular file
+            this.loadFile(entry, (err, file) => {
+                // if a file was loaded we are done
+                if(file) {
+                    return cb(null, file);
+                }
+
+                // otherwise try to load the entry as an index file
+                let entryIndex = path.resolve(entry, this.options.index);
+                this.loadFile(entryIndex, (err, file) => {
+                    // if this ended in a file we are done
+                    if(file) {
+                        return cb(null, file);
+                    }
+
+                    // otherwise we will trigger the directory index load skipping
+                    // all remaining packages since we only want to consider the first
+                    // package file at this point in time
+                    this.loadDirectory(directory, this.options.packages.length, cb);
+                });
+            });
         });
     }
 
@@ -150,12 +172,15 @@ class Resolver {
      * @param  {Function} cb     The function to call when the module is resolved
      */
     resolveRelative(module, cb) {
-        fs.stat(module, (err, stat) => {
-            if(stat && stat.isDirectory()) {
-                this.loadDirectory(module, cb);
-            } else {
-                this.loadFile(module, cb);
+        // attempt to load the module as a file first
+        this.loadFile(module, (err, file) => {
+            // if we found a file we are done
+            if(file) {
+                return cb(null, file);
             }
+
+            // otherwise we must now try to load this module as a directory
+            this.loadDirectory(module, cb);
         });
     }
 
@@ -183,7 +208,7 @@ class Resolver {
         }
 
         let module = path.resolve(base, this.options.modules[directory], moduleName);
-        this.loadDirectory(module, (err, file) => {
+        this.resolveRelative(module, (err, file) => {
             if(file) {
                 return cb(null, file);
             }
@@ -216,7 +241,20 @@ class Resolver {
         }
 
         if(module.match(RELATIVE_PATH)) {
-            this.resolveRelative(path.resolve(base, module), cb);
+            // track if the module ends in a trailing slash
+            let hadTrailingSlash = module[module.length - 1] == '/';
+
+            // make the module path absolute
+            module = path.resolve(base, module);
+
+            // add back the slash if it was there to ensure proper resolution
+            // note: we only have to do this for this resolution, all subsequent
+            // resolutions will properly be requesting directories or files, not both
+            if(hadTrailingSlash) {
+                module += '/';
+            }
+
+            this.resolveRelative(module, cb);
         } else {
             this.resolveModule(base, module, cb);
         }
