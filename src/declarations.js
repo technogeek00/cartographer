@@ -1,3 +1,9 @@
+/**
+ * This module provides the ability to analyze source code and find all
+ * the import and export declarations of various syntax forms.
+ * @module cartographer/declarations
+ */
+
 let path = require('path');
 let File = require('vinyl');
 let esprima = require('esprima');
@@ -96,21 +102,14 @@ function commonJsImport(file, source, node) {
  * the function matching the node type name
  * @param  {Object} handlers An object whose keys are node types and values are functions
  *                           that will be executed when that node type is encountered
- * @param  {[type]} node     The node the parser is currently constructing
- * @param  {[type]} metadata The metadata about the node being constructed
+ * @param  {Object} node     The node the parser is currently constructing
+ * @param  {Object} metadata The metadata about the node being constructed
  */
 function nodeDispatch(handlers, node, metadata) {
     if(handlers[node.type]) {
         handlers[node.type](node, metadata);
     }
 }
-
-/**
- * This module provides the ability to analyze source code and find all
- * the import and export declarations of various syntax forms.
- * @module cartographer/declarations
- */
-Declarations = module.exports
 
 /**
  * This method takes a Vinyl file and finds all the declarations of imports
@@ -120,7 +119,7 @@ Declarations = module.exports
  *                         annotated on it. Only basic normalization is done on
  *                         paths so aliased names will not be combined
  */
-Declarations.analyze = function(file) {
+module.exports.analyze = function(file) {
     if(!File.isVinyl(file) || file.isNull()) {
         return null;
     }

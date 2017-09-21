@@ -1,3 +1,7 @@
+/**
+ * @module cartographer/resolver
+ */
+
 let fs = require('fs');
 let path = require('path');
 let File = require('vinyl');
@@ -12,7 +16,6 @@ const RELATIVE_PATH = /^(\/|\.\/|\.\.\/)/;
 /**
  * This module provides an extended NodeJS resolver that can be
  * configured to look beyond the typical resolution path
- * @module cartographer/resolver
  */
 class Resolver {
     constructor(options = {}) {

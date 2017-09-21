@@ -1,3 +1,6 @@
+/**
+ * @module cartographer
+ */
 let Resolver = require('./resolver');
 let Declarations = require('./declarations');
 let Dependencies = require('./dependencies');
@@ -5,7 +8,6 @@ let Dependencies = require('./dependencies');
 /**
  * A module for analyzing javascript source files to produce a tree
  * of dependencies based on the requirement calls within them
- * @module cartographer
  */
 class Cartographer {
     constructor(options = {}) {
@@ -25,8 +27,10 @@ class Cartographer {
      * @note it is possible for errors to occur during the resolution of dependencies
      *       that are not fatal errors, the dependency will be marked as an error if
      *       such one occurs
+     * @typedef {Function} analyzeCallback
      * @param {Error} err   A fatal error that occurred during analysis
      * @param {Vinyl} file  The vinyl file corresponding to the given file name
+     * @memberof module:cartographer~Cartographer
      */
 
     /**
@@ -34,7 +38,7 @@ class Cartographer {
      * dependency tree based on the require calls within that file
      * and any subsequently required files.
      * @param  {String}                       fileName The file to find dependencies from
-     * @param  {Cartographer~analyzeCallback} cb       A function to call when analysis is complete
+     * @param  {analyzeCallback} cb       A function to call when analysis is complete
      */
     analyze(fileName, cb) {
         this.resolver.resolve(fileName, (err, file) => {
@@ -51,19 +55,22 @@ class Cartographer {
 
 /**
  * The module resolver class used by cartographer
- * @see module:cartographer/resolver
+ * @memberof module:cartographer
+ * @see module:cartographer/resolver~Resolver
  */
 Cartographer.Resolver = Resolver;
 
 /**
  * The declaration analysis class used by cartographer
- * @see module:cartographer/declar
+ * @memberof module:cartographer
+ * @see module:cartographer/declarations
  */
 Cartographer.Declarations = Declarations;
 
 /**
  * The dependency resolver class used by cartographer
- * @see  module:cartographer/dependencies
+ * @memberof module:cartographer
+ * @see module:cartographer/dependencies~Dependencies
  */
 Cartographer.Dependencies = Dependencies;
 

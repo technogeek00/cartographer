@@ -1,3 +1,7 @@
+/**
+ * @module  cartographer/dependencies
+ */
+
 let fs = require('fs');
 let path = require('path');
 let vinyl = require('vinyl');
@@ -9,7 +13,6 @@ let Resolver     = require('./resolver');
  * This module provides the ability to take and analyze a file and all
  * its recursively import dependencies to build a full dependency tree
  * that may be used for file packaging
- * @module cartographer/dependencies
  */
 class Dependencies {
     constructor(options = {}) {
