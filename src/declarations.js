@@ -3,10 +3,21 @@ let File = require('vinyl');
 let esprima = require('esprima');
 
 /**
- * The description of a require call that has been located in a source file
- * @typedef {Object} Requirement
- * @property {Boolean} static Whether or not the requirement is statically declared
- * @property {String} path The literal source that makes up the requirement call
+ * A vinyl file that has been extended to have imports and exports annotated
+ * @typedef {Vinyl} DeclaredVinyl
+ * @property {Import[]} imports An array of imports found during analysis
+ * @property {Export[]} exports An array of exports found during analysis
+ */
+
+/**
+ * The description of an import reference within the file that annotates its
+ * the attributes about the import that will be needed for later cataloging and packing
+ * @typedef {Object} Import
+ * @property {String}      type       The type of import: 'cjs' or 'jsm'
+ * @property {String}      path       The path declared in the import
+ * @property {Boolean}     static     Whether or not this import appears static
+ * @property {Boolean}     fixed      Whether or not this import is to a fixed file location,
+ *                                    this may only be true if static is true
  * @property {Reference[]} references An array of different references to the same
  *                                    requirement throughout the source
  */
@@ -21,11 +32,11 @@ let esprima = require('esprima');
  */
 
 /**
- * This module provides the ability to analyze source code and find all
- * of the require calls that occur within it
- * @module cartographer/required
+ * A regular expression used to test an import path to see if it is
+ * for a fixed path or a possibly module/alias
+ * @type {RegExp}
  */
-Required = module.exports
+const FIXED_PATH = /^(\/|\.\/|\.\.\/)/;
 
 /**
  * A helper method to grab a specific portion of the source
@@ -40,14 +51,13 @@ function grabSource(source, range) {
 
 /**
  * A helper method that analyzes CallExpression nodes to find out if they
- * are require calls and if they are track the requirement
- * @param  {String} source   The source that is currently being traversed
- * @param  {Object} required An object to track requirements found within the
- *                           source AST, stored as source => Requirement
- * @param  {Object} node     A CallExpression node in the tree
- * @param  {Object} metadata  Metadata about the node given to this method
+ * are CommonJS requirement calls and tracks them if they are
+ * @param  {Vinyl}  file      The file that we is currently being parsed that
+ *                            requirements will be tracked on
+ * @param  {String} source    The source that is currently being parsed
+ * @param  {Object} node      A CallExpression node in the tree
  */
-function trackRequirement(source, required, node, metadata) {
+function commonJsImport(file, source, node) {
     let callee = node.callee;
     let args = node.arguments;
 
@@ -57,20 +67,22 @@ function trackRequirement(source, required, node, metadata) {
 
     let first = args[0];
     let staticRequire = first.type == "Literal";
-    let path = grabSource(source, first.range);
+    let importPath = grabSource(source, first.range);
 
     // cleanup static paths since they will likely further resolve
     if(staticRequire) {
-        path = path.substring(1, path.length - 1);
+        importPath = importPath.substring(1, importPath.length - 1);
     }
 
-    required[path] = required[path] || {
-        references : [],
-        path : path,
-        static : staticRequire
+    file.imports[importPath] = file.imports[importPath] || {
+        type : 'cjs',
+        path : importPath,
+        static : staticRequire,
+        fixed : importPath.search(FIXED_PATH) != -1,
+        references : []
     };
 
-    required[path].references.push({
+    file.imports[importPath].references.push({
         source : grabSource(source, node.range),
         position : {
             start : node.range[0],
@@ -94,25 +106,35 @@ function nodeDispatch(handlers, node, metadata) {
 }
 
 /**
- * This method takes a Vinyl file and finds all the require calls
- * within the source it contains
- * @param  {Vinyl} file A vinyl file to analyze
- * @return {Requirement[]} An array of requirements found within the file
- *                         the entries will be unique if the call parameters
- *                         have the exact same source, no attempt is made to
- *                         interpret call arguments.
+ * This module provides the ability to analyze source code and find all
+ * the import and export declarations of various syntax forms.
+ * @module cartographer/declarations
  */
-Required.analyze = function(file) {
+Declarations = module.exports
+
+/**
+ * This method takes a Vinyl file and finds all the declarations of imports
+ * and exports within the source
+ * @param  {Vinyl} file A vinyl file to analyze
+ * @return {DeclaredVinyl} The given vinyl file with declared imports and exports
+ *                         annotated on it. Only basic normalization is done on
+ *                         paths so aliased names will not be combined
+ */
+Declarations.analyze = function(file) {
     if(!File.isVinyl(file) || file.isNull()) {
         return null;
     }
+
     // get a string representation of the file to parse
     let source = file.contents.toString();
 
+    // initialize imports/exports of file
+    file.imports = {};
+    file.exports = {};
+
     // variables used to collect the requirement information within the module
-    let required = {};
     let handler = {
-        CallExpression : trackRequirement.bind(null, source, required)
+        CallExpression : commonJsImport.bind(null, file, source)
     };
 
     // parse the file as a module, scripts are not currently supported
@@ -121,11 +143,12 @@ Required.analyze = function(file) {
     };
     esprima.parseModule(source, parserOptions, nodeDispatch.bind(null, handler));
 
-    // convert response to an array
-    let trimed = [];
-    for(let path in required) {
-        trimed.push(required[path]);
+    // convert import from key'd object to array
+    let imports = [];
+    for(let val in file.imports) {
+        imports.push(file.imports[val]);
     }
+    file.imports = imports;
 
-    return trimed;
+    return file;
 }

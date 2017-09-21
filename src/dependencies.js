@@ -2,13 +2,13 @@ let fs = require('fs');
 let path = require('path');
 let vinyl = require('vinyl');
 
-let Required = require('./required');
-let Resolver = require('./resolver');
+let Declarations = require('./declarations');
+let Resolver     = require('./resolver');
 
 /**
- * This module provides a recursive search ability that takes
- * a given file and returns the tree of dependencies formed by
- * requirement statements amoung all files used
+ * This module provides the ability to take and analyze a file and all
+ * its recursively import dependencies to build a full dependency tree
+ * that may be used for file packaging
  * @module cartographer/dependencies
  */
 class Dependencies {
@@ -17,94 +17,79 @@ class Dependencies {
     }
 
     /**
-     * Helper used to resolve the requirements of the given file
-     * using asynchronous file system queries
-     * @param  {Vinyl}    file         The file currently being analyzed
-     * @param  {Object[]} requirements The requirements identified for this file
-     * @param  {Number}   index        The index of the requirement to process
-     * @param  {Function} cb           The function ta call after analysis is complete
+     * Helper used to resolve the imports of the given file using asynchronous
+     * file system queries
+     * @param  {Vinyl}    file   The file currently being analyzed
+     * @param  {Number}   index  The index of the current import to process
+     * @param  {Function} cb     The function ta call after analysis is complete
      */
-    resolveRequirements(file, requirements, index, cb) {
-        var that = this;
-
+    resolveImports(file, index, cb) {
         // allow index to be omitted
-        if(arguments.length == 3) {
+        if(arguments.length == 2) {
             cb = index;
             index = 0;
         }
 
-        // if we've processed them all continue to the next set
-        if(requirements.length == index) {
+        // if we've processed them all imports we are done
+        if(file.imports.length == index) {
             return cb();
         }
 
-        // get the requirement we are currently inspecting
-        let requirement = requirements[index];
+        // get the import we are currently inspecting
+        let imported = file.imports[index];
 
         // for dynamic dependencies we don't attempt resolving
-        if(!requirement.static) {
-            file.dependencies.push({
-                path: requirement.path,
-                static: requirement.static,
-                references : requirement.references,
-                file : null,
-                error : 'Unable to resolve dynamic dependency'
-            });
-            return this.resolveRequirements(file, requirements, index + 1, cb);
+        // we don't attempt to resolve dynamic imports
+        if(!imported.static) {
+            imported.file = null;
+            imported.error = 'Unable to resolve dynamic import';
+            return this.resolveImports(file, index + 1, cb);
         }
 
-        // for static dependencies see if we already have a resolution
+        // helper to continue resolving, may be called sync or async
+        let continueResolving = () => {
+            this.resolveImports(file, index + 1, cb);
+        }
+
+        // for static imports see if we already have a resolution
         let dirname = file.dirname;
-        if(Dependencies.cache[dirname] && Dependencies.cache[dirname][requirement.path]) {
-            let cacheResult = Dependencies.cache[dirname][requirement.path];
-            file.dependencies.push({
-                path: requirement.path,
-                static: requirement.static,
-                references : requirement.references,
-                file : cacheResult.file,
-                error : cacheResult.error
-            });
-            return this.resolveRequirements(file, requirements, index + 1, cb);
+        if(Dependencies.cache[dirname] && Dependencies.cache[dirname][imported.path]) {
+            let cacheResult = Dependencies.cache[dirname][imported.path];
+            imported.file = cacheResult.file;
+            imported.error = cacheResult.error;
+            return continueResolving();
         }
 
-        // static dependencies have not been found yet, go ahead and resolve it
-        this.resolver.resolve(requirement.path, dirname, (err, dependent) => {
+        // static imports have not been found yet, go ahead and resolve it
+        this.resolver.resolve(imported.path, dirname, (err, dependent) => {
             if(!dependent) {
-                err = 'Unable to locate dependency';
+                err = 'Unable to locate import';
                 dependent = null;
             }
 
             // Cache the result, including errors
             Dependencies.cache[dirname] = Dependencies.cache[dirname] || {};
-            Dependencies.cache[dirname][requirement.path] = {
+            Dependencies.cache[dirname][imported.path] = {
                 file : dependent,
                 error : err
             };
 
-            file.dependencies.push({
-                path: requirement.path,
-                static: requirement.static,
-                references : requirement.references,
-                file : dependent,
-                error : err
-            });
+            imported.file = dependent;
+            imported.error = err;
 
             if(dependent) {
-                // if we did indeed find a file, resolve its dependencies
-                this.analyze(dependent, () => {
-                    // then continue with the current ones
-                    this.resolveRequirements(file, requirements, index + 1, cb);
-                });
+                // if we did indeed find a file, resolve its dependencies before continuing
+                this.analyze(dependent, continueResolving)
             } else {
-                // otherwise resolve the next dependency of the current file
-                this.resolveRequirements(file, requirements, index + 1, cb);
+                // otherwise continue directly
+                continueResolving();
             }
         });
     }
 
     /**
-     * Analyze the given file to find the tree of dependencies created by
-     * the requirement calls within the file
+     * Analyze the given file to find the tree of dependencies creaded by the
+     * import calls within the file
      * @param  {Vinyl}    file The file to analyze
      * @param  {Function} cb   The function to call when analysis is complete
      */
@@ -114,19 +99,17 @@ class Dependencies {
             return;
         }
 
-        // if the file has already been processed don't do it again
-        if(file.dependencies) {
+        // if the file has already been processed for declarations we
+        // dont have to process this file again
+        if(file.imports) {
             return cb();
         }
 
-        // setup a dependencies array
-        file.dependencies = [];
-
-        // otherwise compute the dependencies for this file
-        let requirements = Required.analyze(file);
+        // analyze the file for declarations
+        file = Declarations.analyze(file);
 
         // and then resolve the dependencies of those files
-        this.resolveRequirements(file, requirements, cb);
+        this.resolveImports(file, cb);
     }
 }
 

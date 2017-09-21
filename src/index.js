@@ -1,5 +1,5 @@
 let Resolver = require('./resolver');
-let Required = require('./required');
+let Declarations = require('./declarations');
 let Dependencies = require('./dependencies');
 
 /**
@@ -56,10 +56,10 @@ class Cartographer {
 Cartographer.Resolver = Resolver;
 
 /**
- * The requirement analysis class used by cartographer
- * @see module:cartographer/required
+ * The declaration analysis class used by cartographer
+ * @see module:cartographer/declar
  */
-Cartographer.Required = Required;
+Cartographer.Declarations = Declarations;
 
 /**
  * The dependency resolver class used by cartographer
